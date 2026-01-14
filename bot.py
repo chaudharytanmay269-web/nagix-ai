@@ -18,33 +18,33 @@ verified_users = set()
 
 @app.route('/')
 def home():
-    return "NAGIX AI PREMIUM IS ONLINE"
+    return "NAGIX AI IS TOTALLY ACTIVE"
 
 # --- 🏠 START COMMAND ---
 @bot.message_handler(commands=['start'])
 def start(m):
     markup = types.InlineKeyboardMarkup(row_width=1)
     btn1 = types.InlineKeyboardButton("📢 Join Update Channel", url=CHANNEL_URL)
-    btn2 = types.InlineKeyboardButton("✅ Verify & Unlock AI", callback_data="verify")
+    btn2 = types.InlineKeyboardButton("✅ Verify & Start Chatting", callback_data="verify")
     markup.add(btn1, btn2)
     
     msg = (
-        "✨ **NAGIX AI PREMIUM v2.0** ✨\n"
+        "✨ **NAGIX AI PREMIUM v3.0** ✨\n"
         "━━━━━━━━━━━━━━━━━━\n"
-        "👋 **Welcome!** Main ek powerful AI assistant hoon.\n\n"
-        "⚠️ **Access Restricted:**\n"
-        "Aapko bot use karne ke liye hamara channel join karna hoga aur niche diye gaye button se verify karna hoga.\n\n"
-        "🔗 **Join Now:** [Click Here](" + CHANNEL_URL + ")"
+        "👋 **Welcome Boss!**\n\n"
+        "Main aapka personal AI assistant hoon. Aage badhne ke liye niche diye gaye steps follow karein:\n\n"
+        "1️⃣ Hamara channel join karein.\n"
+        "2️⃣ **Verify** button par click karein."
     )
     bot.send_message(m.chat.id, msg, reply_markup=markup, parse_mode="Markdown")
 
-# --- ✅ VERIFICATION CALLBACK ---
+# --- ✅ VERIFICATION ---
 @bot.callback_query_handler(func=lambda call: call.data == "verify")
 def verify_user(call):
     verified_users.add(call.from_user.id)
-    bot.answer_callback_query(call.id, "✅ Verified! Welcome to Premium.")
+    bot.answer_callback_query(call.id, "✅ Access Granted!")
     bot.edit_message_text(
-        "🔓 **Verification Successful!**\n\nAb aap mujhse kuch bhi puch sakte hain. Main taiyaar hoon! 🚀",
+        "🔓 **Verification Successful!**\n\nAb aap mujhse koi bhi sawal puch sakte hain. Main taiyaar hoon! 🚀",
         call.message.chat.id, 
         call.message.message_id,
         parse_mode="Markdown"
@@ -53,38 +53,48 @@ def verify_user(call):
 # --- 🤖 AI CHAT LOGIC ---
 @bot.message_handler(func=lambda m: True)
 def ai_chat(m):
-    # Verification Check
     if m.from_user.id not in verified_users:
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("✅ Click to Verify", callback_data="verify"))
-        bot.reply_to(m, "🚫 **Access Denied!**\nPehle verify karein.", reply_markup=markup)
+        markup.add(types.InlineKeyboardButton("✅ Verify", callback_data="verify"))
+        bot.reply_to(m, "🚫 **Access Denied!**\nPehle verify button dabayein.", reply_markup=markup)
         return
 
-    # Typing Animation
     bot.send_chat_action(m.chat.id, 'typing')
     
-    # Stable v1 API (No 404 Guaranteed)
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={API_KEY}"
-    payload = {"contents": [{"parts": [{"text": m.text}]}]}
+    # URL and Payload with Safety Settings disabled
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
+    
+    payload = {
+        "contents": [{"parts": [{"text": m.text}]}],
+        "safetySettings": [
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
+        ]
+    }
     
     try:
-        response = requests.post(url, json=payload, timeout=10)
+        response = requests.post(url, json=payload, timeout=15)
         data = response.json()
         
-        if 'candidates' in data:
+        # If successfully answered
+        if 'candidates' in data and len(data['candidates']) > 0:
             ai_text = data['candidates'][0]['content']['parts'][0]['text']
-            
-            # Interesting Formatting
-            header = "🤖 **NAGIX AI:**\n\n"
-            footer = f"\n\n━━━━━━━━━━━━━━\n👤 **Owner:** {OWNER}"
-            bot.reply_to(m, header + ai_text + footer, parse_mode="Markdown")
+            footer = f"\n\n━━━━━━━━━━━━━━\n🌟 **Owner:** {OWNER}"
+            bot.reply_to(m, ai_text + footer, parse_mode="Markdown")
+        
+        # Detailed Error Reporting if API fails
         else:
-            bot.reply_to(m, "⚠️ AI abhi thoda busy hai, dubara try karein!")
-            
+            error_msg = data.get('error', {}).get('message', 'Unknown API Error')
+            if "API_KEY_INVALID" in error_msg:
+                bot.reply_to(m, "❌ **API Key Galat Hai!**\nNayi API Key banakar code mein update karein.")
+            else:
+                bot.reply_to(m, f"⚠️ **Google AI Error:**\n`{error_msg}`")
+                
     except Exception as e:
-        bot.reply_to(m, "❌ Connection Error! Server down hai.")
+        bot.reply_to(m, "❌ **Connection Timeout!**\nRender server busy hai, thodi der mein try karein.")
 
-# --- 🚀 PORT BINDING ---
 def run():
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
@@ -92,4 +102,4 @@ def run():
 if __name__ == "__main__":
     t = Thread(target=run)
     t.start()
-    bot.infinity_polling(timeout=60)
+    bot.infinity_polling()
